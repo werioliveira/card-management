@@ -54,8 +54,8 @@ export default function TransactionsPage() {
       try {
         // Adicionamos o filterMonth na URL
         const url = `/api/transactions?page=${currentPage}&limit=12${
-          filterMonth ? `&month=${filterMonth}` : ""
-        }`
+        filterMonth ? `&month=${filterMonth}` : ""
+      }${search ? `&search=${search}` : ""}`
         
         const txRes = await fetch(url)
         const [cardsRes, peopleRes, catsRes] = await Promise.all([
@@ -77,22 +77,54 @@ export default function TransactionsPage() {
       }
     }
     fetchData()
-  }, [currentPage, filterMonth])
+  }, [currentPage, filterMonth, search])
 
   const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch = t.description.toLowerCase().includes(search.toLowerCase())
-    const matchesPerson = filterPerson === "all" || t.personId === filterPerson
-    const matchesCard = filterCard === "all" || t.cardId === filterCard
-    
-    return matchesSearch && matchesPerson && matchesCard
-  })
+  const matchesPerson = filterPerson === "all" || t.personId === filterPerson
+  const matchesCard = filterCard === "all" || t.cardId === filterCard
+  return matchesPerson && matchesCard
+})
 
   // 3. Resete a página para 1 quando mudar o mês
   const handleMonthChange = (val: string) => {
     setFilterMonth(val)
     setCurrentPage(1)
   }
+  const handleSearchChange = (val: string) => {
+    setSearch(val)
+    setCurrentPage(1) // Volta para a primeira página ao buscar
+  }
+  const handleDelete = async (transaction: Transaction) => {
+    let url = `/api/transactions/${transaction.id}`;
+    
+    if (transaction.installments && transaction.installments > 1) {
+      const confirmAll = window.confirm(
+        `Esta é a parcela ${transaction.currentInstallment}/${transaction.installments}.\n\n` +
+        `Clique em OK para deletar TODAS as parcelas deste item.\n` +
+        `Clique em CANCELAR para deletar APENAS esta parcela.`
+      );
+      
+      if (confirmAll) {
+        url += "?all=true";
+      } else {
+        // Se ele não quis deletar tudo, mas ainda quer deletar a parcela atual:
+        const confirmSingle = window.confirm("Deseja deletar APENAS esta parcela individual?");
+        if (!confirmSingle) return;
+      }
+    } else {
+      if (!confirm("Deseja excluir esta transação?")) return;
+    }
 
+    try {
+      const res = await fetch(url, { method: "DELETE" });
+      if (res.ok) {
+        // Recarrega a página ou atualiza o estado
+        window.location.reload(); 
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
   const getPerson = (id: string) => people.find((p) => p.id === id)
   const getCard = (id: string) => cards.find((c) => c.id === id)
   const getCategory = (id: string) => categories.find((c) => c.id === id)
@@ -114,12 +146,12 @@ export default function TransactionsPage() {
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar nesta página..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-secondary border-border text-foreground"
-            />
+              <Input
+                placeholder="Buscar em todo o histórico..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9 bg-secondary border-border text-foreground"
+              />
           </div>
           
           <Select value={filterPerson} onValueChange={setFilterPerson}>
@@ -211,6 +243,19 @@ export default function TransactionsPage() {
                             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount)}
                           </span>
                         </TableCell>
+                          <TableCell className="text-right pr-6 flex justify-end gap-2">
+                            <span className="font-bold text-primary mr-4">
+                              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount)}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDelete(transaction)}
+                            >
+                              <Search className="h-4 w-4 rotate-45" /> {/* Use um ícone de Trash/Lixeira se preferir */}
+                            </Button>
+                          </TableCell>
                       </TableRow>
                     )
                   })}

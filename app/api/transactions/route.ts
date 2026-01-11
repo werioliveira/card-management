@@ -42,42 +42,41 @@ async function updateInvoice(cardId: string, dateStr: string, userId: string) {
   );
 }
 
-// --- GET: Busca Transações com Paginação ---
 export async function GET(request: Request) {
   await initDb()
-
-  // Pega o usuário injetado pelo middleware
   const userId = request.headers.get("x-user-id")
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get("page") ?? "1")
   const limit = parseInt(searchParams.get("limit") ?? "10")
-  const monthFilter = searchParams.get("month") // Ex: "2026-01"
+  const monthFilter = searchParams.get("month")
+  const search = searchParams.get("search") // <-- Pega o termo de busca
 
   const offset = (page - 1) * limit
 
   try {
-    // Filtra sempre pelo userId
     let query = `SELECT * FROM transactions WHERE userId = ?`
     let countQuery = `SELECT COUNT(*) as total FROM transactions WHERE userId = ?`
     let params: any[] = [userId]
 
-    // Adiciona o filtro de mês no SQL se ele existir
     if (monthFilter) {
-      const filter = `${monthFilter}%` // Busca tudo que começa com YYYY-MM
       query += ` AND date LIKE ?`
       countQuery += ` AND date LIKE ?`
-      params.push(filter)
+      params.push(`${monthFilter}%`)
+    }
+
+    // ADICIONE ISSO: Filtro de busca no SQL
+    if (search) {
+      query += ` AND description LIKE ?`
+      countQuery += ` AND description LIKE ?`
+      params.push(`%${search}%`)
     }
 
     query += ` ORDER BY date DESC LIMIT ? OFFSET ?`
     
     const countResult = await get(countQuery, params)
     const totalItems = countResult?.total ?? 0
-    
     const rows = await all(query, [...params, limit, offset])
 
     return NextResponse.json({
@@ -92,10 +91,9 @@ export async function GET(request: Request) {
       }
     })
   } catch (error) {
-    return NextResponse.json({ error: "Erro ao buscar transações" }, { status: 500 })
+    return NextResponse.json({ error: "Erro ao buscar" }, { status: 500 })
   }
 }
-
 // --- POST: Cria Transação (Única ou Parcelada) ---
 export async function POST(request: Request) {
   try {
