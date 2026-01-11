@@ -225,7 +225,7 @@ export function AddTransactionDialog({ people, cards, categories, onAdd }: AddTr
                 id="installments"
                 type="number"
                 min="1"
-                max="24"
+                max="999"
                 value={formData.installments}
                 onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
                 className="bg-secondary border-border"

@@ -3,6 +3,45 @@ import { revalidatePath } from "next/cache"
 import initDb from "@/lib/init-db"
 import { all, run, get } from "@/lib/db"
 
+// Função auxiliar para atualizar a fatura
+async function updateInvoice(cardId: string, dateStr: string, userId: string) {
+  const date = new Date(dateStr + "T12:00:00");
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  
+  // PADRONIZAÇÃO: Usar monthStr (com zero) em todos os lugares
+  const monthStr = month.toString().padStart(2, '0');
+  
+  // Agora o ID da fatura será sempre inv-ID-2026-01 (com zero)
+  const invoiceId = `inv-${cardId}-${year}-${monthStr}`;
+
+  // 1. Soma transações filtrando por cardId, userId e Mês
+  const result = await get(
+    `SELECT SUM(amount) as total FROM transactions 
+     WHERE cardId = ? AND userId = ? AND date LIKE ?`,
+    [cardId, userId, `${year}-${monthStr}%`]
+  );
+
+  const total = result?.total || 0;
+
+  // 2. UPSERT: Se o ID existir, ele atualiza o valor. Se não, cria.
+  await run(
+    `INSERT INTO invoices (id, cardId, month, year, totalAmount, status, dueDate, userId)
+     VALUES (?, ?, ?, ?, ROUND(?, 2), 'open', ?, ?)
+     ON CONFLICT(id) DO UPDATE SET totalAmount = ROUND(?, 2)`,
+    [
+      invoiceId, 
+      cardId, 
+      month, // Aqui pode ser o número puro, é apenas uma coluna informativa
+      year, 
+      total, 
+      `${year}-${monthStr}-10`, 
+      userId,
+      total // Valor para o UPDATE
+    ]
+  );
+}
+
 // --- GET: Busca Transações com Paginação ---
 export async function GET(request: Request) {
   await initDb()
@@ -110,6 +149,7 @@ export async function POST(request: Request) {
             userId,
           ]
         )
+        await updateInvoice(body.cardId, formattedDate, userId);
       }
     } else {
       // Transação Única (Mantida)
