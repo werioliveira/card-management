@@ -1,14 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { PlusCircle } from "lucide-react"
+import { PlusCircle, Calculator, ReceiptText } from "lucide-react"
 import type { Person, CreditCard, ExpenseCategory } from "@/lib/types"
 import { formatCurrency, parseCurrencyToNumber } from "@/lib/utils"
 
@@ -16,20 +15,13 @@ interface AddTransactionDialogProps {
   people: Person[]
   cards: CreditCard[]
   categories: ExpenseCategory[]
-  onAdd?: (transaction: {
-    description: string
-    amount: number
-    date: string
-    cardId: string
-    personId: string
-    categoryId: string
-    installments?: number
-    startInstallment?: number
-  }) => void
+  onAdd?: (transaction: any) => void
 }
 
 export function AddTransactionDialog({ people, cards, categories, onAdd }: AddTransactionDialogProps) {
   const [open, setOpen] = useState(false)
+  const [entryMode, setEntryMode] = useState<"total" | "installment">("total")
+  
   const [formData, setFormData] = useState({
     description: "",
     amount: "",
@@ -38,12 +30,16 @@ export function AddTransactionDialog({ people, cards, categories, onAdd }: AddTr
     personId: "",
     categoryId: "",
     installments: "1",
-    startInstallment: "1", 
+    startInstallment: "1",
   })
 
-  const amount = Number.parseFloat(formData.amount) || 0
-  const installments = Number.parseInt(formData.installments) || 1
-  const amountPerInstallment = amount / installments
+  // Lógica de Cálculo Dinâmico
+  const installmentsNum = Math.max(1, Number.parseInt(formData.installments) || 1)
+  const rawAmount = Number.parseFloat(formData.amount) || 0
+  
+  // Se for modo parcela, multiplicamos para achar o total. Se for total, mantemos.
+  const calculatedTotal = entryMode === "total" ? rawAmount : rawAmount * installmentsNum
+  const amountPerInstallment = entryMode === "total" ? rawAmount / installmentsNum : rawAmount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,12 +47,12 @@ export function AddTransactionDialog({ people, cards, categories, onAdd }: AddTr
       const payload = {
         id: Date.now().toString(),
         description: formData.description,
-        amount: Number.parseFloat(formData.amount),
+        amount: calculatedTotal, // Sempre envia o total para o backend
         date: formData.date,
         cardId: formData.cardId,
         personId: formData.personId,
         categoryId: formData.categoryId,
-        installments: Number.parseInt(formData.installments),
+        installments: installmentsNum,
         startInstallment: Number.parseInt(formData.startInstallment),
       }
       
@@ -88,182 +84,182 @@ export function AddTransactionDialog({ people, cards, categories, onAdd }: AddTr
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 cursor-pointer">
+        <Button className="gap-2 cursor-pointer shadow-lg hover:scale-105 transition-transform">
           <PlusCircle className="h-4 w-4" />
           Nova Despesa
         </Button>
       </DialogTrigger>
+      
       <DialogContent className="bg-card border-border sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="text-card-foreground">Adicionar Nova Despesa</DialogTitle>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <ReceiptText className="h-5 w-5 text-primary" />
+            Adicionar Transação
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Seletor de Modo de Entrada */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-foreground">
-              Descrição
-            </Label>
+            <Label className="text-xs font-bold uppercase text-muted-foreground">Como deseja informar o valor?</Label>
+            <div className="flex bg-secondary/50 p-1 rounded-lg gap-1 border border-border">
+              <Button
+                type="button"
+                variant={entryMode === "total" ? "default" : "ghost"}
+                size="sm"
+                className="flex-1 h-8 text-xs font-semibold cursor-pointer"
+                onClick={() => setEntryMode("total")}
+              >
+                Valor Total da Compra
+              </Button>
+              <Button
+                type="button"
+                variant={entryMode === "installment" ? "default" : "ghost"}
+                size="sm"
+                className="flex-1 h-8 text-xs font-semibold cursor-pointer"
+                onClick={() => setEntryMode("installment")}
+              >
+                Valor de 1 Parcela
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição</Label>
             <Input
               id="description"
-              placeholder="Ex: iFood, Uber, Netflix..."
+              placeholder="Ex: Tênis Nike, Mercado Mensal..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="bg-secondary border-border"
+              className="bg-secondary/50 border-border"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount" className="text-foreground">
-                Valor Total
+              <Label htmlFor="amount" className="text-primary font-bold">
+                {entryMode === "total" ? "Valor Total" : "Valor da Parcela"}
               </Label>
               <Input
                 id="amount"
-                type="text" // Mudamos para text para permitir símbolos
-                placeholder="R$ 0,00"
-                // Exibimos o valor formatado enquanto o usuário digita
+                type="text"
                 value={formatCurrency(formData.amount)} 
                 onChange={(e) => {
-                  const rawValue = e.target.value
-                  // Converte a string "R$ 10,50" de volta para o número 10.50
-                  const numericValue = parseCurrencyToNumber(rawValue).toString()
+                  const numericValue = parseCurrencyToNumber(e.target.value).toString()
                   setFormData({ ...formData, amount: numericValue })
                 }}
-                className="bg-secondary border-border font-medium text-lg"
+                className="bg-secondary/50 border-border text-lg font-bold"
                 required
               />
-              <p className="text-xs text-muted-foreground">Valor total da despesa</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="date" className="text-foreground">
-                Data
-              </Label>
+              <Label htmlFor="date">Data da Compra</Label>
               <Input
                 id="date"
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                className="bg-secondary border-border"
+                className="bg-secondary/50 border-border"
                 required
               />
             </div>
           </div>
 
-          {/* Resumo de parcelas */}
-          {amount > 0 && installments > 1 && (
-            <div className="bg-secondary/50 rounded-lg p-3 space-y-1 border border-border">
-              <p className="text-sm font-semibold text-foreground">Resumo de Parcelas</p>
-              <p className="text-sm text-muted-foreground">
-                Valor total: <span className="font-semibold text-foreground">R$ {amount.toLocaleString("pt-BR")}</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {installments}x de: <span className="font-semibold text-foreground">R$ {amountPerInstallment.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Pessoa Responsável</Label>
+              <Select value={formData.personId} onValueChange={(v) => setFormData({ ...formData, personId: v })}>
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue placeholder="Quem gastou?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {people.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Cartão Utilizado</Label>
+              <Select value={formData.cardId} onValueChange={(v) => setFormData({ ...formData, cardId: v })}>
+                <SelectTrigger className="bg-secondary/50 border-border">
+                  <SelectValue placeholder="Qual cartão?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cards.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2 col-span-1">
+              <Label>Parcelas</Label>
+              <Input
+                type="number"
+                min="1"
+                value={formData.installments}
+                onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
+                className="bg-secondary/50 border-border text-center"
+              />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Já paguei até a...</Label>
+              <Input
+                type="number"
+                min="1"
+                max={formData.installments}
+                value={formData.startInstallment}
+                onChange={(e) => setFormData({ ...formData, startInstallment: e.target.value })}
+                className="bg-secondary/50 border-border text-center"
+              />
+            </div>
+          </div>
+
+          {/* Card de Resumo e Conferência */}
+          {calculatedTotal > 0 && (
+            <div className="bg-primary/10 rounded-xl p-4 border border-primary/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-primary uppercase flex items-center gap-1">
+                  <Calculator className="h-3 w-3" /> Resumo do Lançamento
+                </span>
+                {entryMode === "installment" && (
+                  <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
+                    Calculado: Parcela × {installmentsNum}
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {installmentsNum}x de <span className="text-foreground font-bold">R$ {amountPerInstallment.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                  </p>
+                  {Number(formData.startInstallment) > 1 && (
+                    <p className="text-[10px] text-orange-500 font-medium">
+                      ⚠️ Começará na parcela {formData.startInstallment}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground leading-none">Total da Despesa</p>
+                  <p className="text-xl font-black text-primary tracking-tight">
+                    R$ {calculatedTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-foreground">Pessoa</Label>
-              <Select
-                value={formData.personId}
-                onValueChange={(value) => setFormData({ ...formData, personId: value })}
-              >
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {people.map((person) => (
-                    <SelectItem key={person.id} value={person.id}>
-                      {person.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-foreground">Cartão</Label>
-              <Select value={formData.cardId} onValueChange={(value) => setFormData({ ...formData, cardId: value })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cards.map((card) => (
-                    <SelectItem key={card.id} value={card.id}>
-                      {card.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-foreground">Categoria</Label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-              >
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="installments" className="text-foreground">
-                Número de Parcelas
-              </Label>
-              <Input
-                id="installments"
-                type="number"
-                min="1"
-                max="999"
-                value={formData.installments}
-                onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
-                className="bg-secondary border-border"
-              />
-              <p className="text-xs text-muted-foreground">1-24 parcelas</p>
-            </div>
-<div className="grid grid-cols-2 gap-4">
-  <div className="space-y-2">
-    <Label htmlFor="installments">Total de Parcelas</Label>
-    <Input
-      id="installments"
-      type="number"
-      value={formData.installments}
-      onChange={(e) => setFormData({ ...formData, installments: e.target.value })}
-      className="bg-secondary border-border"
-    />
-  </div>
-  <div className="space-y-2">
-    <Label htmlFor="startInstallment">Já paguei até a...</Label>
-    <Input
-      id="startInstallment"
-      type="number"
-      min="1"
-      max={formData.installments}
-      value={formData.startInstallment}
-      onChange={(e) => setFormData({ ...formData, startInstallment: e.target.value })}
-      className="bg-secondary border-border"
-    />
-    <p className="text-[10px] text-muted-foreground">Ex: Se colocar 3, ele lança da 3 em diante.</p>
-  </div>
-</div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-border cursor-pointer">
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="cursor-pointer bg-destructive/80 hover:bg-destructive px-8 font-bold">
               Cancelar
             </Button>
-            <Button className="cursor-pointer" type="submit">Adicionar</Button>
+            <Button type="submit" className="px-8 font-bold cursor-pointer hover:bg-primary/90">
+              Confirmar Lançamento
+            </Button>
           </div>
         </form>
       </DialogContent>
