@@ -1,0 +1,251 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { PlusCircle, ArrowLeft, Edit, Trash2 } from "lucide-react"
+
+interface Person {
+  id: string
+  name: string
+  email: string
+  color: string
+}
+
+export default function PeoplePage() {
+  const [people, setPeople] = useState<Person[]>([])
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+
+  // Fetch people on mount
+  useEffect(() => {
+    const fetchPeople = async () => {
+      try {
+        const res = await fetch("/api/people")
+        if (res.ok) setPeople(await res.json())
+      } catch (err) {
+        console.error("Erro ao buscar pessoas:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchPeople()
+  }, [])
+
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/people?id=${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setPeople(people.filter((p) => p.id !== id))
+      }
+    } catch (err) {
+      console.error("Erro ao deletar pessoa:", err)
+    }
+  }
+
+  const handleEdit = async (person: Person) => {
+    try {
+      const formData = new FormData()
+      formData.append("name", person.name)
+      formData.append("email", person.email)
+      formData.append("color", person.color)
+
+      const res = await fetch(`/api/people/${person.id}`, {
+        method: "PUT",
+        body: formData,
+      })
+      if (res.ok) {
+        setPeople(people.map((p) => (p.id === person.id ? person : p)))
+        setEditingPerson(null)
+      }
+    } catch (err) {
+      console.error("Erro ao editar pessoa:", err)
+    }
+  }
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/" className="p-2 hover:bg-secondary rounded-lg transition-colors">
+            <ArrowLeft className="h-6 w-6 text-foreground" />
+          </Link>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-foreground">Pessoas</h1>
+            <p className="text-muted-foreground mt-1">Gerencie as pessoas da sua conta</p>
+          </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Adicionar Pessoa
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="text-card-foreground">Adicionar Nova Pessoa</DialogTitle>
+              </DialogHeader>
+              <form action="/api/people" method="POST" className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-foreground">Nome</Label>
+                  <Input
+                    name="name"
+                    placeholder="Ex: João Silva"
+                    className="bg-secondary border-border"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Email</Label>
+                  <Input
+                    name="email"
+                    type="email"
+                    placeholder="joao@email.com"
+                    className="bg-secondary border-border"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Cor</Label>
+                  <Input
+                    name="color"
+                    type="color"
+                    defaultValue="#10b981"
+                    className="h-10 cursor-pointer"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="submit">Adicionar</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Carregando...</p>
+          </div>
+        ) : people.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Nenhuma pessoa cadastrada</p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-secondary/50 hover:bg-secondary/50">
+                  <TableHead className="text-muted-foreground">Pessoa</TableHead>
+                  <TableHead className="text-muted-foreground">Email</TableHead>
+                  <TableHead className="text-right text-muted-foreground w-24">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {people.map((person) => (
+                  <TableRow key={person.id} className="border-border hover:bg-secondary/30">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback style={{ backgroundColor: person.color }} className="text-xs font-semibold text-white">
+                            {person.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="font-medium text-foreground">{person.name}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{person.email}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="bg-card border-border sm:max-w-[500px]">
+                            <DialogHeader>
+                              <DialogTitle className="text-card-foreground">Editar Pessoa</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label className="text-foreground">Nome</Label>
+                                <Input
+                                  defaultValue={person.name}
+                                  onChange={(e) => setEditingPerson({ ...person, name: e.target.value })}
+                                  className="bg-secondary border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-foreground">Email</Label>
+                                <Input
+                                  type="email"
+                                  defaultValue={person.email}
+                                  onChange={(e) => setEditingPerson({ ...person, email: e.target.value })}
+                                  className="bg-secondary border-border"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-foreground">Cor</Label>
+                                <Input
+                                  type="color"
+                                  defaultValue={person.color}
+                                  onChange={(e) => setEditingPerson({ ...person, color: e.target.value })}
+                                  className="h-10 cursor-pointer"
+                                />
+                              </div>
+                              <div className="flex justify-end gap-3 pt-4">
+                                <Button type="button" variant="outline" onClick={() => {
+                                  setEditingPerson(null)
+                                  setEditDialogOpen(false)
+                                }}>Cancelar</Button>
+                                <Button onClick={() => {
+                                  handleEdit(editingPerson || person)
+                                  setEditDialogOpen(false)
+                                }}>Salvar</Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-card border-border">
+                            <AlertDialogTitle className="text-foreground">Deletar pessoa?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-muted-foreground">
+                              Tem certeza que deseja deletar {person.name}? Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                            <div className="flex gap-3 justify-end">
+                              <AlertDialogCancel className="border-border">Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(person.id)}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                Deletar
+                              </AlertDialogAction>
+                            </div>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        </div>
+  )
+}
