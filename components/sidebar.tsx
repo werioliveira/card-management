@@ -22,13 +22,16 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300",
-        collapsed ? "w-20" : "w-64",
+        "fixed z-40 bg-sidebar transition-all duration-300 border-sidebar-border",
+        // Mobile: Barra de navegação inferior
+        "bottom-0 left-0 w-full h-16 border-t flex flex-row items-center justify-between px-4",
+        // Desktop: Sidebar lateral
+        "md:left-0 md:top-0 md:h-screen md:border-r md:border-t-0 md:flex-col md:justify-start md:items-stretch md:px-0",
+        collapsed ? "md:w-20" : "md:w-64",
       )}
     >
-      <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
+        <div className="hidden md:flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
           {!collapsed && (
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
@@ -45,7 +48,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className={cn("text-sidebar-foreground", collapsed && "hidden")}
+            className={cn("text-sidebar-foreground cursor-pointer", collapsed && "hidden")}
             onClick={() => setCollapsed(!collapsed)}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -53,7 +56,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-4">
+        <nav className="flex-1 flex flex-row md:flex-col gap-1 p-0 md:p-4 justify-around md:justify-start w-full md:w-auto items-center md:items-stretch">
           {navItems.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -61,15 +64,16 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 font-medium transition-colors",
                   isActive
                     ? "bg-sidebar-accent text-primary"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  collapsed && "justify-center",
+                  collapsed && "md:justify-center",
+                  "flex-col md:flex-row gap-1 md:gap-3 p-1 md:px-3 md:py-2.5 text-[10px] md:text-sm"
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <span className={cn("md:inline", collapsed ? "md:hidden" : "")}>{item.label}</span>
               </Link>
             )
           })}
@@ -81,13 +85,12 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -right-3 top-20 h-6 w-6 rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground"
+            className="hidden md:flex absolute -right-3 top-20 h-6 w-6 rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground cursor-pointer"
             onClick={() => setCollapsed(false)}
           >
             <ChevronRight className="h-3 w-3" />
           </Button>
         )}
-      </div>
     </aside>
   )
 }

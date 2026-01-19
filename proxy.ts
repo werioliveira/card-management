@@ -1,44 +1,52 @@
 /* c:\Users\Weri\Documents\dev\card-managment\middleware.ts */
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { decrypt } from '@/lib/auth'
 
-export default function proxy(request: NextRequest) {
-  // Pega o header de autorização (Basic Auth)
-  const basicAuth = request.headers.get('authorization')
+export async function proxy(request: NextRequest) {
+  const session = request.cookies.get('session')?.value
+  const { pathname } = request.nextUrl
 
-  if (basicAuth) {
-    // Decodifica o header "Basic base64..."
-    const authValue = basicAuth.split(' ')[1]
-    const [user, pwd] = atob(authValue).split(':')
+  // Rotas públicas que não precisam de autenticação
+  const isPublicPath = pathname === '/login' || pathname === '/register'
 
-    // Defina suas credenciais aqui ou, idealmente, em variáveis de ambiente (.env)
-    // Ex: BASIC_AUTH_USER=admin e BASIC_AUTH_PASS=senha123
-    const validUser = process.env.BASIC_AUTH_USER
-    const validPass = process.env.BASIC_AUTH_PASS
+  // Se não tem sessão e tenta acessar rota protegida -> Login
+  if (!session && !isPublicPath) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
 
-    if (user === validUser && pwd === validPass) {
-      // Se autenticado, injeta o ID do usuário nos headers para a API usar
+  if (session) {
+    try {
+      const payload = await decrypt(session)
+      
+      // Se já está logado e tenta acessar login/register -> Dashboard
+      if (isPublicPath) {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+
+      // Injeta o ID do usuário nos headers para a API usar (mantém compatibilidade)
       const requestHeaders = new Headers(request.headers)
-      requestHeaders.set('x-user-id', user)
+      requestHeaders.set('x-user-id', payload.sub as string)
 
       return NextResponse.next({
         request: {
           headers: requestHeaders,
         },
       })
+    } catch (error) {
+      // Token inválido ou expirado
+      if (!isPublicPath) {
+        const response = NextResponse.redirect(new URL('/login', request.url))
+        response.cookies.delete('session')
+        return response
+      }
     }
   }
 
-  // Se não autenticado, retorna 401 e pede login ao navegador
-  return new NextResponse('Authentication required', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': 'Basic realm="Secure Area"',
-    },
-  })
+  return NextResponse.next()
 }
 
 export const config = {
-  // Protege todas as rotas, exceto arquivos estáticos e imagens do Next.js
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Ignora rotas de API de auth, estáticos e imagens
+  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico).*)'],
 }

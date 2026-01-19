@@ -24,7 +24,7 @@ export default function RootLayout({
       <body>
         <div className="min-h-screen bg-background">
           <Sidebar />
-          <main className="pl-64 transition-all duration-300">
+          <main className="md:pl-64 pb-20 md:pb-0 transition-all duration-300">
             {children}
             <Analytics />
           </main>

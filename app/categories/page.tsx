@@ -70,7 +70,7 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/" className="p-2 hover:bg-secondary rounded-lg transition-colors">
             <ArrowLeft className="h-6 w-6 text-foreground" />

@@ -1,3 +1,4 @@
+/* c:\Users\Weri\Documents\dev\card-managment\app\cards\page.tsx */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { PlusCircle, ArrowLeft, Edit, Trash2 } from "lucide-react"
 import { formatCurrency, parseCurrencyToNumber } from "@/lib/utils"
+import { UserMenu } from "@/components/user-menu"
 
 interface Card {
   id: string
@@ -27,22 +29,63 @@ export default function CardsPage() {
   const [editingCard, setEditingCard] = useState<Card | null>(null)
   const [loading, setLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  
+  // Estados para o formulário de criação
+  const [newName, setNewName] = useState("")
+  const [newLastDigits, setNewLastDigits] = useState("")
+  const [newBrand, setNewBrand] = useState("mastercard")
   const [newLimit, setNewLimit] = useState(0)
+  const [newColor, setNewColor] = useState("#8b5cf6")
+  const [newClosingDay, setNewClosingDay] = useState("1")
+  const [newDueDay, setNewDueDay] = useState("8")
 
-  // Fetch cards on mount
-  useEffect(() => {
-    const fetchCards = async () => {
-      try {
-        const res = await fetch("/api/cards")
-        if (res.ok) setCards(await res.json())
-      } catch (err) {
-        console.error("Erro ao buscar cartões:", err)
-      } finally {
-        setLoading(false)
-      }
+  const fetchCards = async () => {
+    try {
+      const res = await fetch("/api/cards")
+      if (res.ok) setCards(await res.json())
+    } catch (err) {
+      console.error("Erro ao buscar cartões:", err)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchCards()
   }, [])
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const payload = {
+        name: newName,
+        lastDigits: newLastDigits,
+        brand: newBrand,
+        limit: newLimit,
+        color: newColor,
+        closingDay: parseInt(newClosingDay),
+        dueDay: parseInt(newDueDay)
+      }
+
+      const res = await fetch("/api/cards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+
+      if (res.ok) {
+        setCreateDialogOpen(false)
+        // Reset form
+        setNewName("")
+        setNewLastDigits("")
+        setNewLimit(0)
+        fetchCards()
+      }
+    } catch (err) {
+      console.error("Erro ao criar cartão:", err)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     try {
@@ -55,38 +98,36 @@ export default function CardsPage() {
     }
   }
 
-const handleEdit = async (card: Card) => {
-  // 1. Criamos o JSON com os dados (mais limpo que FormData para PUT)
-  const payload = {
-    name: card.name,
-    lastDigits: card.lastDigits,
-    brand: card.brand,
-    limit: card.limit, // Aqui já vai o número puro vindo da máscara
-    closingDay: card.closingDay,
-    dueDay: card.dueDay,
-    color: card.color,
-  }
-
-  try {
-    // 2. A URL deve terminar com o ID para sua API ler via pathParts
-    const res = await fetch(`/api/cards?id=${card.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-
-    if (res.ok) {
-      setCards(cards.map((c) => (c.id === card.id ? card : c)))
-      setEditingCard(null)
-      setEditDialogOpen(false)
+  const handleEdit = async (card: Card) => {
+    const payload = {
+      name: card.name,
+      lastDigits: card.lastDigits,
+      brand: card.brand,
+      limit: card.limit,
+      closingDay: card.closingDay,
+      dueDay: card.dueDay,
+      color: card.color,
     }
-  } catch (err) {
-    console.error("Erro ao editar cartão:", err)
+
+    try {
+      const res = await fetch(`/api/cards?id=${card.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (res.ok) {
+        setCards(cards.map((c) => (c.id === card.id ? card : c)))
+        setEditingCard(null)
+        setEditDialogOpen(false)
+      }
+    } catch (err) {
+      console.error("Erro ao editar cartão:", err)
+    }
   }
-}
 
   return (
-    <div className="min-h-screen bg-background pl-64 p-8">
+    <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <Link href="/" className="p-2 hover:bg-secondary rounded-lg transition-colors">
@@ -96,7 +137,10 @@ const handleEdit = async (card: Card) => {
             <h1 className="text-3xl font-bold text-foreground">Cartões de Crédito</h1>
             <p className="text-muted-foreground mt-1">Gerencie seus cartões</p>
           </div>
-          <Dialog>
+          
+          <UserMenu />
+
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 cursor-pointer">
                 <PlusCircle className="h-4 w-4" />
@@ -107,11 +151,12 @@ const handleEdit = async (card: Card) => {
               <DialogHeader>
                 <DialogTitle className="text-card-foreground">Adicionar Novo Cartão</DialogTitle>
               </DialogHeader>
-              <form action="/api/cards" method="POST" className="space-y-4">
+              <form onSubmit={handleCreate} className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-foreground">Nome do Cartão</Label>
                   <Input
-                    name="name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
                     placeholder="Ex: Nubank, Itaú..."
                     className="bg-secondary border-border"
                     required
@@ -121,7 +166,8 @@ const handleEdit = async (card: Card) => {
                   <div className="space-y-2">
                     <Label className="text-foreground">Últimos 4 dígitos</Label>
                     <Input
-                      name="lastDigits"
+                      value={newLastDigits}
+                      onChange={(e) => setNewLastDigits(e.target.value)}
                       placeholder="1234"
                       maxLength={4}
                       className="bg-secondary border-border"
@@ -130,8 +176,8 @@ const handleEdit = async (card: Card) => {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-foreground">Marca</Label>
-                    <Select defaultValue="mastercard">
-                      <SelectTrigger name="brand" className="bg-secondary border-border">
+                    <Select value={newBrand} onValueChange={setNewBrand}>
+                      <SelectTrigger className="bg-secondary border-border">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -144,26 +190,23 @@ const handleEdit = async (card: Card) => {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-  <Label className="text-foreground">Limite (R$)</Label>
-  {/* Campo invisível que realmente envia o número para o banco */}
-  <input type="hidden" name="limit" value={newLimit} /> 
-  
-  <Input
-    type="text"
-    placeholder="R$ 0,00"
-    value={formatCurrency(newLimit)}
-    onChange={(e) => setNewLimit(parseCurrencyToNumber(e.target.value))}
-    className="bg-secondary border-border"
-    required
-  />
-</div>
+                  <div className="space-y-2">
+                    <Label className="text-foreground">Limite (R$)</Label>
+                    <Input
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={formatCurrency(newLimit)}
+                      onChange={(e) => setNewLimit(parseCurrencyToNumber(e.target.value))}
+                      className="bg-secondary border-border"
+                      required
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-foreground">Cor</Label>
                     <Input
-                      name="color"
                       type="color"
-                      defaultValue="#8b5cf6"
+                      value={newColor}
+                      onChange={(e) => setNewColor(e.target.value)}
                       className="h-10 cursor-pointer"
                     />
                   </div>
@@ -172,11 +215,11 @@ const handleEdit = async (card: Card) => {
                   <div className="space-y-2">
                     <Label className="text-foreground">Dia de Fechamento</Label>
                     <Input
-                      name="closingDay"
                       type="number"
                       min="1"
                       max="31"
-                      placeholder="1"
+                      value={newClosingDay}
+                      onChange={(e) => setNewClosingDay(e.target.value)}
                       className="bg-secondary border-border"
                       required
                     />
@@ -184,11 +227,11 @@ const handleEdit = async (card: Card) => {
                   <div className="space-y-2">
                     <Label className="text-foreground">Dia de Vencimento</Label>
                     <Input
-                      name="dueDay"
                       type="number"
                       min="1"
                       max="31"
-                      placeholder="8"
+                      value={newDueDay}
+                      onChange={(e) => setNewDueDay(e.target.value)}
                       className="bg-secondary border-border"
                       required
                     />
@@ -218,7 +261,6 @@ const handleEdit = async (card: Card) => {
                 className="p-6 rounded-xl text-white shadow-lg hover:shadow-2xl transition-all hover:-translate-y-1 relative flex flex-col h-full"
                 style={{ backgroundColor: card.color }}
               >
-                {/* Conteúdo do cartão */}
                 <div className="flex-1">
                   <div className="mb-4">
                     <div className="text-sm opacity-75 mb-1">CARTÃO DE CRÉDITO</div>
@@ -244,7 +286,6 @@ const handleEdit = async (card: Card) => {
                   </div>
                 </div>
 
-                {/* Botões - sempre visíveis no footer */}
                 <div className="flex gap-2 mt-6 pt-4 border-t border-white border-opacity-20">
                   <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                     <DialogTrigger asChild>
@@ -276,21 +317,19 @@ const handleEdit = async (card: Card) => {
                               className="bg-secondary border-border"
                             />
                           </div>
-<div className="space-y-2">
-  <Label className="text-foreground">Limite (R$)</Label>
-  <Input
-    type="text"
-    placeholder="R$ 0,00"
-    // Usa o limite do cartão que está sendo editado ou 0
-    value={formatCurrency(editingCard?.limit || card.limit)}
-    onChange={(e) => {
-      const numeric = parseCurrencyToNumber(e.target.value)
-      // Atualiza o objeto de edição com o número puro
-      setEditingCard({ ...(editingCard || card), limit: numeric })
-    }}
-    className="bg-secondary border-border"
-  />
-</div>
+                          <div className="space-y-2">
+                            <Label className="text-foreground">Limite (R$)</Label>
+                            <Input
+                              type="text"
+                              placeholder="R$ 0,00"
+                              value={formatCurrency(editingCard?.limit || card.limit)}
+                              onChange={(e) => {
+                                const numeric = parseCurrencyToNumber(e.target.value)
+                                setEditingCard({ ...(editingCard || card), limit: numeric })
+                              }}
+                              className="bg-secondary border-border"
+                            />
+                          </div>
                         </div>
                         <div className="flex justify-end gap-3 pt-4">
                           <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
