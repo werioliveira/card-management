@@ -6,7 +6,7 @@ import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
-
+import { Toaster } from "@/components/ui/toaster"
 export const metadata: Metadata = {
   title: "CardManager - Gerenciamento de Faturas",
   description: "Sistema completo de gerenciamento de faturas de cartão de crédito",
@@ -24,11 +24,13 @@ export default function RootLayout({
       <body>
         <div className="min-h-screen bg-background">
           <Sidebar />
-          <main className="md:pl-64 pb-20 md:pb-0 transition-all duration-300">
+          <main className="md:pl-64 pb-20 md:pb-0">
             {children}
+
             <Analytics />
           </main>
         </div>
+          <Toaster />
       </body>
     </html>
   )

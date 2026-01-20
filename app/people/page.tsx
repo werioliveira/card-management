@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { PlusCircle, ArrowLeft, Edit, Trash2 } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
 interface Person {
   id: string
@@ -23,7 +24,9 @@ export default function PeoplePage() {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null)
   const [loading, setLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
   // Fetch people on mount
   useEffect(() => {
     const fetchPeople = async () => {
@@ -38,7 +41,6 @@ export default function PeoplePage() {
     }
     fetchPeople()
   }, [])
-
   const handleDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/people?id=${id}`, { method: "DELETE" })
@@ -69,7 +71,54 @@ export default function PeoplePage() {
       console.error("Erro ao editar pessoa:", err)
     }
   }
+  const handleAdd = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    
+    const form = e.currentTarget 
+    setIsSubmitting(true)
 
+    const formData = new FormData(form)
+    const data = Object.fromEntries(formData.entries())
+
+    try {
+      const res = await fetch("/api/people", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+
+      if (res.ok) {
+        const newPerson = await res.json()
+        setPeople((prev) => [...prev, newPerson]) 
+        
+        // 2. Limpe o formulário antes de fechar o modal
+        form.reset() 
+        setAddDialogOpen(false) 
+        toast({
+          title: "Sucesso!",
+          description: `${newPerson.name} foi adicionado(a) com sucesso.`,
+          duration: 3000,
+        })
+      }
+      else{
+        toast({
+          variant: "destructive",
+          title: "Erro ao adicionar",
+          description: "Não foi possível salvar a pessoa. Tente novamente.",
+        })
+      }
+    } catch (err) {
+      console.error("Erro ao adicionar:", err)
+
+        toast({
+        variant: "destructive",
+        title: "Erro de conexão",
+        description: "Verifique sua internet ou tente mais tarde.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
   return (
     <div className="p-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
@@ -80,52 +129,47 @@ export default function PeoplePage() {
             <h1 className="text-3xl font-bold text-foreground">Pessoas</h1>
             <p className="text-muted-foreground mt-1">Gerencie as pessoas da sua conta</p>
           </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <PlusCircle className="h-4 w-4" />
-                Adicionar Pessoa
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-card border-border sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle className="text-card-foreground">Adicionar Nova Pessoa</DialogTitle>
-              </DialogHeader>
-              <form action="/api/people" method="POST" className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-foreground">Nome</Label>
-                  <Input
-                    name="name"
-                    placeholder="Ex: João Silva"
-                    className="bg-secondary border-border"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-foreground">Email</Label>
-                  <Input
-                    name="email"
-                    type="email"
-                    placeholder="joao@email.com"
-                    className="bg-secondary border-border"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-foreground">Cor</Label>
-                  <Input
-                    name="color"
-                    type="color"
-                    defaultValue="#10b981"
-                    className="h-10 cursor-pointer"
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button type="submit">Adicionar</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+<Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+  <DialogTrigger asChild>
+    <Button className="gap-2">
+      <PlusCircle className="h-4 w-4" />
+      Adicionar Pessoa
+    </Button>
+  </DialogTrigger>
+  <DialogContent className="bg-card border-border sm:max-w-[500px]">
+    <DialogHeader>
+      <DialogTitle>Adicionar Nova Pessoa</DialogTitle>
+    </DialogHeader>
+    
+    {/* Mudança: onSubmit em vez de action/method */}
+    <form onSubmit={handleAdd} className="space-y-4">
+      <div className="space-y-2">
+        <Label>Nome</Label>
+        <Input name="name" placeholder="Ex: João Silva" required />
+      </div>
+      <div className="space-y-2">
+        <Label>Email</Label>
+        <Input name="email" type="email" placeholder="joao@email.com" />
+      </div>
+      <div className="space-y-2">
+        <Label>Cor</Label>
+        <Input name="color" type="color" defaultValue="#10b981" className="h-10" />
+      </div>
+      <div className="flex justify-end gap-3 pt-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => setAddDialogOpen(false)}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Adicionando..." : "Adicionar"}
+        </Button>
+      </div>
+    </form>
+  </DialogContent>
+</Dialog>
         </div>
 
         {loading ? (
