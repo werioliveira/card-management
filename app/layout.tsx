@@ -4,9 +4,9 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
+import { Toaster } from "sonner"
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
-import { Toaster } from "@/components/ui/toaster"
 export const metadata: Metadata = {
   title: "CardManager - Gerenciamento de Faturas",
   description: "Sistema completo de gerenciamento de faturas de cartão de crédito",
@@ -30,7 +30,7 @@ export default function RootLayout({
             <Analytics />
           </main>
         </div>
-          <Toaster />
+          <Toaster richColors position="top-right" />
       </body>
     </html>
   )

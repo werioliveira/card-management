@@ -1,4 +1,3 @@
-/* c:\Users\Weri\Documents\dev\card-managment\app\cards\page.tsx */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -12,13 +11,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { PlusCircle, ArrowLeft, Edit, Trash2 } from "lucide-react"
 import { formatCurrency, parseCurrencyToNumber } from "@/lib/utils"
 import { UserMenu } from "@/components/user-menu"
+import { toast } from "sonner"
 
 interface Card {
   id: string
   name: string
   lastDigits: string
   brand: string
-  "limit": number
+  limit: number
   closingDay: number
   dueDay: number
   color: string
@@ -30,8 +30,8 @@ export default function CardsPage() {
   const [loading, setLoading] = useState(true)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Estados para o formulário de criação
   const [newName, setNewName] = useState("")
   const [newLastDigits, setNewLastDigits] = useState("")
   const [newBrand, setNewBrand] = useState("mastercard")
@@ -46,6 +46,7 @@ export default function CardsPage() {
       if (res.ok) setCards(await res.json())
     } catch (err) {
       console.error("Erro ao buscar cartões:", err)
+      toast.error("Não foi possível carregar os cartões.")
     } finally {
       setLoading(false)
     }
@@ -57,6 +58,7 @@ export default function CardsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     try {
       const payload = {
         name: newName,
@@ -75,15 +77,19 @@ export default function CardsPage() {
       })
 
       if (res.ok) {
+        toast.success("Cartão adicionado com sucesso!")
         setCreateDialogOpen(false)
-        // Reset form
         setNewName("")
         setNewLastDigits("")
         setNewLimit(0)
         fetchCards()
+      } else {
+        toast.error("Erro ao criar cartão.")
       }
     } catch (err) {
-      console.error("Erro ao criar cartão:", err)
+      toast.error("Erro de conexão ao criar cartão.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -92,9 +98,12 @@ export default function CardsPage() {
       const res = await fetch(`/api/cards?id=${id}`, { method: "DELETE" })
       if (res.ok) {
         setCards(cards.filter((c) => c.id !== id))
+        toast.success("Cartão excluído!")
+      } else {
+        toast.error("Erro ao excluir cartão.")
       }
     } catch (err) {
-      console.error("Erro ao deletar cartão:", err)
+      toast.error("Erro de conexão ao excluir.")
     }
   }
 
@@ -120,9 +129,12 @@ export default function CardsPage() {
         setCards(cards.map((c) => (c.id === card.id ? card : c)))
         setEditingCard(null)
         setEditDialogOpen(false)
+        toast.success("Alterações salvas!")
+      } else {
+        toast.error("Erro ao editar cartão.")
       }
     } catch (err) {
-      console.error("Erro ao editar cartão:", err)
+      toast.error("Erro de conexão ao editar.")
     }
   }
 
@@ -130,7 +142,7 @@ export default function CardsPage() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/" className="p-2 hover:bg-secondary rounded-lg transition-colors">
+          <Link href="/" className="p-2 hover:bg-secondary rounded-lg transition-colors cursor-pointer">
             <ArrowLeft className="h-6 w-6 text-foreground" />
           </Link>
           <div className="flex-1">
@@ -177,14 +189,14 @@ export default function CardsPage() {
                   <div className="space-y-2">
                     <Label className="text-foreground">Marca</Label>
                     <Select value={newBrand} onValueChange={setNewBrand}>
-                      <SelectTrigger className="bg-secondary border-border">
+                      <SelectTrigger className="bg-secondary border-border cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="mastercard">MasterCard</SelectItem>
-                        <SelectItem value="visa">Visa</SelectItem>
-                        <SelectItem value="amex">American Express</SelectItem>
-                        <SelectItem value="elo">Elo</SelectItem>
+                        <SelectItem value="mastercard" className="cursor-pointer">MasterCard</SelectItem>
+                        <SelectItem value="visa" className="cursor-pointer">Visa</SelectItem>
+                        <SelectItem value="amex" className="cursor-pointer">American Express</SelectItem>
+                        <SelectItem value="elo" className="cursor-pointer">Elo</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -237,8 +249,10 @@ export default function CardsPage() {
                     />
                   </div>
                 </div>
-                <div className="flex justify-end gap-3 pt-4 ">
-                  <Button type="submit" className="cursor-pointer">Adicionar Cartão</Button>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="submit" className="cursor-pointer" disabled={isSubmitting}>
+                    {isSubmitting ? "Salvando..." : "Adicionar Cartão"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -273,7 +287,7 @@ export default function CardsPage() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <div className="opacity-75 text-xs">Limite</div>
-                      <div className="font-semibold">R$ {card["limit"].toLocaleString("pt-BR")}</div>
+                      <div className="font-semibold">R$ {card.limit.toLocaleString("pt-BR")}</div>
                     </div>
                     <div>
                       <div className="opacity-75 text-xs">Fechamento</div>
@@ -287,7 +301,10 @@ export default function CardsPage() {
                 </div>
 
                 <div className="flex gap-2 mt-6 pt-4 border-t border-white border-opacity-20">
-                  <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                  <Dialog open={editDialogOpen && editingCard?.id === card.id} onOpenChange={(open) => {
+                    setEditDialogOpen(open);
+                    if (open) setEditingCard(card);
+                  }}>
                     <DialogTrigger asChild>
                       <Button size="sm" variant="secondary" className="flex-1 h-9 cursor-pointer">
                         <Edit className="h-4 w-4 mr-2" />
@@ -303,7 +320,7 @@ export default function CardsPage() {
                           <Label className="text-foreground">Nome do Cartão</Label>
                           <Input
                             defaultValue={card.name}
-                            onChange={(e) => setEditingCard({ ...card, name: e.target.value })}
+                            onChange={(e) => setEditingCard({ ...(editingCard || card), name: e.target.value })}
                             className="bg-secondary border-border"
                           />
                         </div>
@@ -312,7 +329,7 @@ export default function CardsPage() {
                             <Label className="text-foreground">Últimos 4 dígitos</Label>
                             <Input
                               defaultValue={card.lastDigits}
-                              onChange={(e) => setEditingCard({ ...card, lastDigits: e.target.value })}
+                              onChange={(e) => setEditingCard({ ...(editingCard || card), lastDigits: e.target.value })}
                               maxLength={4}
                               className="bg-secondary border-border"
                             />
@@ -321,8 +338,7 @@ export default function CardsPage() {
                             <Label className="text-foreground">Limite (R$)</Label>
                             <Input
                               type="text"
-                              placeholder="R$ 0,00"
-                              value={formatCurrency(editingCard?.limit || card.limit)}
+                              value={formatCurrency(editingCard?.id === card.id ? editingCard.limit : card.limit)}
                               onChange={(e) => {
                                 const numeric = parseCurrencyToNumber(e.target.value)
                                 setEditingCard({ ...(editingCard || card), limit: numeric })
@@ -332,20 +348,17 @@ export default function CardsPage() {
                           </div>
                         </div>
                         <div className="flex justify-end gap-3 pt-4">
-                          <Button type="button" variant="outline" className="cursor-pointer" onClick={() => {
-                            setEditingCard(null)
-                            setEditDialogOpen(false)
-                          }}>
+                          <Button type="button" variant="outline" className="cursor-pointer" onClick={() => setEditDialogOpen(false)}>
                             Cancelar
                           </Button>
-                          <Button className="cursor-pointer" onClick={() => {
-                            handleEdit(editingCard || card)
-                            setEditDialogOpen(false)
-                          }}>Salvar</Button>
+                          <Button className="cursor-pointer" onClick={() => handleEdit(editingCard || card)}>
+                            Salvar
+                          </Button>
                         </div>
                       </div>
                     </DialogContent>
                   </Dialog>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button size="sm" variant="destructive" className="h-9 px-3 cursor-pointer">
@@ -355,7 +368,7 @@ export default function CardsPage() {
                     <AlertDialogContent className="bg-card border-border">
                       <AlertDialogTitle className="text-foreground">Deletar cartão?</AlertDialogTitle>
                       <AlertDialogDescription className="text-muted-foreground">
-                        Tem certeza que deseja deletar {card.name}? Esta ação não pode ser desfeita.
+                        Tem certeza que deseja deletar {card.name}?
                       </AlertDialogDescription>
                       <div className="flex gap-3 justify-end">
                         <AlertDialogCancel className="border-border cursor-pointer">Cancelar</AlertDialogCancel>
