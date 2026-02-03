@@ -10,13 +10,14 @@ import { InvoiceCards } from "@/components/invoice-cards"
 import { AddTransactionDialog } from "@/components/add-transaction-dialog"
 import { UserMenu } from "@/components/user-menu"
 import { Input } from "@/components/ui/input"
+import type { CreditCard, Person, ExpenseCategory, Transaction, Invoice } from "@/lib/types"
 
 export default function DashboardPage() {
-  const [cards, setCards] = useState([])
-  const [people, setPeople] = useState([])
-  const [categories, setCategories] = useState([])
-  const [transactions, setTransactions] = useState([])
-  const [invoices, setInvoices] = useState([])
+  const [cards, setCards] = useState<CreditCard[]>([])
+  const [people, setPeople] = useState<Person[]>([])
+  const [categories, setCategories] = useState<ExpenseCategory[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   
   // Estado para o filtro de mês (Padrão: Mês atual YYYY-MM)
@@ -50,7 +51,6 @@ export default function DashboardPage() {
       setInvoices(invData)
       setTransactions(txData.data || [])
       
-      return { ok: true } 
     } catch (err) {
       console.error("Erro ao buscar dados:", err)
       throw err
@@ -68,12 +68,32 @@ export default function DashboardPage() {
   const selectedYearInt = parseInt(yearStr)
   const selectedMonthInt = parseInt(monthStr)
 
-  // Filtra faturas pelo mês selecionado
+  // Faturas pelo mês selecionado (para contexto)
   const monthlyInvoices = invoices.filter(inv => 
     inv.month === selectedMonthInt && inv.year === selectedYearInt
   )
 
+  // Lista para exibir: só mês atual e anteriores (não as 24 parcelas futuras)
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  const isPastOrCurrentMonth = (inv: Invoice) =>
+    inv.year < currentYear || (inv.year === currentYear && inv.month <= currentMonth)
+
+  const unpaidInvoices = invoices.filter(
+    (inv) => inv.status !== "paid" && isPastOrCurrentMonth(inv)
+  )
+
   const monthlyTotalFiltered = monthlyInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0)
+
+  // Uso do limite = TODAS as faturas em aberto (como cartão real: 20k parcelados = 20k usados; libera ao marcar como paga)
+  const allUnpaidInvoices = invoices.filter((inv) => inv.status !== "paid")
+  const usedByCardId: Record<string, number> = {}
+  cards.forEach((card) => {
+    usedByCardId[card.id] = allUnpaidInvoices
+      .filter((inv) => inv.cardId === card.id)
+      .reduce((sum, inv) => sum + inv.totalAmount, 0)
+  })
 
   // As transações já vêm filtradas pela API, mas garantimos a consistência
   const currentMonthTransactions = transactions
@@ -136,11 +156,10 @@ export default function DashboardPage() {
           {/* Ações */}
           <div className="flex items-center gap-2 justify-between sm:justify-start">
              <AddTransactionDialog 
-              transactions={currentMonthTransactions}
               people={people} 
               cards={cards} 
               categories={categories} 
-              onAdd={fetchData} 
+              onAdd={async () => { await fetchData() }} 
             />
             <UserMenu />
           </div>
@@ -167,16 +186,59 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Faturas do Mês */}
+      {/* Uso do limite por cartão (barra de progresso) */}
       <section>
         <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-primary" />
-          Faturas de {displayDate}
+          Uso do limite por cartão
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+          {cards.map((card) => {
+            const used = usedByCardId[card.id] ?? 0
+            const limit = card.limit || 1
+            const percent = Math.min(100, (used / limit) * 100)
+            return (
+              <div
+                key={card.id}
+                className="bg-card rounded-xl border border-border p-4 shadow-sm"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: card.color }}
+                  />
+                  <span className="font-semibold text-foreground">{card.name}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                  <span>Usado: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(used)}</span>
+                  <span>Limite: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(card.limit)}</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${percent}%`,
+                      backgroundColor: card.color,
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* Faturas em aberto (todos os meses — não perde dívida ao virar o mês) */}
+      <section>
+        <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-primary" />
+          Faturas em aberto
         </h2>
         <InvoiceCards 
-          invoices={monthlyInvoices} 
+          invoices={unpaidInvoices} 
+          allUnpaidInvoices={allUnpaidInvoices}
           cards={cards} 
-          onRefresh={fetchData} 
+          onRefresh={async () => { await fetchData() }} 
         />
       </section>
 
