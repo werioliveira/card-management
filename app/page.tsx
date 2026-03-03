@@ -10,6 +10,7 @@ import { InvoiceCards } from "@/components/invoice-cards"
 import { AddTransactionDialog } from "@/components/add-transaction-dialog"
 import { UserMenu } from "@/components/user-menu"
 import { Input } from "@/components/ui/input"
+import { ExportInvoiceDialog } from "@/components/ExportInvoiceDialog"
 
 export default function DashboardPage() {
   const [cards, setCards] = useState([])
@@ -142,6 +143,13 @@ export default function DashboardPage() {
               categories={categories} 
               onAdd={fetchData} 
             />
+             <ExportInvoiceDialog 
+                transactions={currentMonthTransactions}
+                people={people}
+                cards={cards}
+                categories={categories}
+                month={selectedMonth}
+             />
             <UserMenu />
           </div>
         </div>
