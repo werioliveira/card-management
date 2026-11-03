@@ -1,12 +1,15 @@
 "use client"
 
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Edit, X, Trash } from "lucide-react"
 import type { Transaction, Person, CreditCard, ExpenseCategory } from "@/lib/types"
 
 interface TransactionsTableProps {
@@ -20,6 +23,19 @@ export function TransactionsTable({ transactions, people, cards, categories }: T
   const [search, setSearch] = useState("")
   const [filterPerson, setFilterPerson] = useState<string>("all")
   const [filterCard, setFilterCard] = useState<string>("all")
+  const navigate = useNavigate()
+
+  const openEditDialog = (transaction: Transaction) => {
+    navigate(`/transactions/edit/${transaction.id}`)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Tem certeza que deseja excluir esta transação?")) {
+      // Here we would call the delete API
+      // For now, we'll just alert
+      alert("Funcionalidade de exclusão em desenvolvimento")
+    }
+  }
 
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch = t.description.toLowerCase().includes(search.toLowerCase())
@@ -150,6 +166,24 @@ export function TransactionsTable({ transactions, people, cards, categories }: T
                   </TableCell>
                   <TableCell className="text-right font-medium text-foreground">
                     {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(transaction.amount)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEditDialog(transaction)}
+                        className="text-primary hover:text-primary/90"
+                        title="Editar"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(transaction.id)}
+                        className="text-destructive hover:text-destructive/90"
+                        title="Excluir"
+                      >
+                        <Trash size={16} />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )
