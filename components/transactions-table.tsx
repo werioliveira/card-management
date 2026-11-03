@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useRouter } from "next/navigation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -23,20 +23,17 @@ export function TransactionsTable({ transactions, people, cards, categories }: T
   const [search, setSearch] = useState("")
   const [filterPerson, setFilterPerson] = useState<string>("all")
   const [filterCard, setFilterCard] = useState<string>("all")
-  const navigate = useNavigate()
+  const router = useRouter()
 
   const openEditDialog = (transaction: Transaction) => {
-    navigate(`/transactions/edit/${transaction.id}`)
+    router.push(`/transactions/edit/${transaction.id}`)
   }
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Tem certeza que deseja excluir esta transação?")) {
-      // Here we would call the delete API
-      // For now, we'll just alert
       alert("Funcionalidade de exclusão em desenvolvimento")
     }
   }
-
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch = t.description.toLowerCase().includes(search.toLowerCase())
     const matchesPerson = filterPerson === "all" || t.personId === filterPerson
